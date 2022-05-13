@@ -1,7 +1,7 @@
 # select a random word between 5-12 characters long
 
 # function to render the current state of the game (_ r o g r a _ _ i n g) and the remaining number of guesses
-# player can guess one letter or entire word
+
 # 8 wrong guesses triggers end of game
 # Implement last: at any time, user can save the state of the game (name: timestamp of when the game was saved). At the beginning of the game, an option to start a new game or load a previous one
 
@@ -13,7 +13,9 @@ class Game
 
   def initialize
     @game_board = []
+    @game_word = nil # this variable is used to detect if the user guesses the whole word outright
     @num_guesses_remaining = $num_guesses
+    @save_word = 'SAVE'
   end
 
   # load all dictionary words from file into array
@@ -28,13 +30,13 @@ class Game
     dictionary_array
   end
 
-  # choose a random word between 5 and 12 characters, inclusive
+  # Choose a random word between 5 and 12 characters, inclusive. Returned word is always upper case
   def choose_random_word(dictionary_array)
     random_index = rand(1...dictionary_array.length)
     until (dictionary_array[random_index].length >= 5 && dictionary_array[random_index].length <= 12) 
       random_index = rand(1...dictionary_array.length)
     end
-    dictionary_array[random_index]
+    dictionary_array[random_index].upcase
   end
 
   # take a word and create a board with Cell objects for each character, with no chars revealed
@@ -50,38 +52,104 @@ class Game
     board
   end
 
+  # display the current state of the game
   def render_board
     puts @game_board.join(' ')
-    puts ""
+    puts ''
     puts "#{@num_guesses_remaining} guesses remain"
+    puts ''
   end
 
-  def play_game
-    dictionary_array = load_dictionary_words("../dictionary.txt")
-    random_word = choose_random_word(dictionary_array)
-    @game_board = generate_board(random_word)
+  # if letter exists on the board, reveal it
+  def board_reveal_letter(letter)
+    @game_board.map do |cell|
+      if cell.letter == letter
+        cell.revealed = true
+      end
+    end
+
+  end
+
+  # reveal all letters, used when user guesses whole word outright
+  def board_reveal_all_letters
+    @game_board.map {|cell| cell.revealed = true}
+  end
+
+  # play one round of the game
+  # if "save" is entered, save the game
+  # player can guess one letter or entire word
+  def play_round
+
+    # add input processing: must be a single letter, case insensitive
+    
+    puts 'Enter a letter or whole word: '
+    puts "Enter #{@save_word} to save the state of the game"
+    input = gets.chomp.strip.upcase
+    puts ''
+
+    # If save_word was entered, serialize the game state
+    if input == save_word
+      puts 'save game code here'
+    # Allow the user to guess the entire word outright
+    elsif input == @game_word
+      board_reveal_all_letters
+    # If input is a single letter, reveal any matching letters in the word
+    elsif input.length == 1
+      board_reveal_letter(input)
+    end
+
+    @num_guesses_remaining -= 1
+    
     render_board
   end
 
-  def play_round
+  # if all cells have been revealed, then return true
+  def player_win?
+    num_revealed = @game_board.select {|cell| cell.revealed == true}.length
 
+    num_revealed == @game_board.length ? true : false
   end
 
-end
 
+  # if a save game exists, ask the user if they want to load it
+  # during play_round, ask user to enter save_word to trigger a save
+  # save should be named based on timestamp
+  def play_game
+    dictionary_array = load_dictionary_words('../dictionary.txt')
+    
+    # disabled random word for debugging
+    # random_word = choose_random_word(dictionary_array)
+    random_word = 'AAABBBCCC'
+    
+    
+    @game_board = generate_board(random_word)
+    @game_word = random_word
 
-# I hope not to need this class, but just in case I will define it here as a reminder if I do
-class Board
+    render_board
+
+    # loop until the player guesses the word or runs out of guesses
+    until player_win? || @num_guesses_remaining <= 0
+      play_round
+    end
+
+    if player_win?
+      puts 'Congratulations, you guessed the word!'
+    else
+      puts 'Dang! You ran out of guesses'
+    end
+  end
+
 
 end
 
 class Cell
   attr_accessor :revealed
+  attr_reader :letter
   
   # A cell is not revealed by default
-  def initialize(letter, revealed = false)
+  def initialize(letter)
     @letter = letter
-    @revealed = revealed
+    @revealed = false
   end
 
   # If a cell is revealed, return the letter. Otherwise, return "_"
@@ -89,7 +157,7 @@ class Cell
     if revealed
       @letter
     else
-      "_"
+      '_'
     end
   end
 end
