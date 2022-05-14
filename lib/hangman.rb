@@ -6,16 +6,21 @@
 # Implement last: at any time, user can save the state of the game (name: timestamp of when the game was saved). At the beginning of the game, an option to start a new game or load a previous one
 
 # an array of letters. If "_" then the letter is 
+
+# TODO: If save_word is the chosen random word, choose another one
+
 class Game
 
-  # number of total guesses a player can make
+  # total guesses a player can make
   $num_guesses = 8
 
-  def initialize
-    @game_board = []
-    @game_word = nil # this variable is used to detect if the user guesses the whole word outright
-    @num_guesses_remaining = $num_guesses
-    @save_word = 'SAVE'
+  # command that triggers serialization
+  $save_word = 'SAVE'
+
+  def initialize (game_board=[], game_word=nil, num_guesses_remaining=$num_guesses)
+    @game_board = game_board
+    @game_word = game_word # this variable is used to detect if the user guesses the whole word outright
+    @num_guesses_remaining = num_guesses_remaining
   end
 
   # load all dictionary words from file into array
@@ -78,29 +83,33 @@ class Game
   # play one round of the game
   # if "save" is entered, save the game
   # player can guess one letter or entire word
+  
   def play_round
+    # loop until the player guesses the word or runs out of guesses
+    until player_win? || @num_guesses_remaining <= 0
+      # add input processing: must be a single letter, case insensitive
+      
+      puts 'Enter a letter or whole word: '
+      # puts "Enter #{$save_word} to save the state of the game"
+      input = gets.chomp.strip.upcase
+      puts ''
 
-    # add input processing: must be a single letter, case insensitive
-    
-    puts 'Enter a letter or whole word: '
-    puts "Enter #{@save_word} to save the state of the game"
-    input = gets.chomp.strip.upcase
-    puts ''
+      # If save_word was entered, serialize the game state
+      # if input == $save_word
+      #   puts 'save game code here'
+      #   next
+      # Allow the user to guess the entire word outright
+      if input == @game_word
+        board_reveal_all_letters
+      # If input is a single letter, reveal any matching letters in the word
+      elsif input.length == 1
+        board_reveal_letter(input)
+      end
 
-    # If save_word was entered, serialize the game state
-    if input == save_word
-      puts 'save game code here'
-    # Allow the user to guess the entire word outright
-    elsif input == @game_word
-      board_reveal_all_letters
-    # If input is a single letter, reveal any matching letters in the word
-    elsif input.length == 1
-      board_reveal_letter(input)
+      @num_guesses_remaining -= 1
+      
+      render_board
     end
-
-    @num_guesses_remaining -= 1
-    
-    render_board
   end
 
   # if all cells have been revealed, then return true
@@ -116,21 +125,12 @@ class Game
   # save should be named based on timestamp
   def play_game
     dictionary_array = load_dictionary_words('../dictionary.txt')
-    
-    # disabled random word for debugging
-    # random_word = choose_random_word(dictionary_array)
-    random_word = 'AAABBBCCC'
-    
-    
+    random_word = choose_random_word(dictionary_array)
     @game_board = generate_board(random_word)
     @game_word = random_word
 
     render_board
-
-    # loop until the player guesses the word or runs out of guesses
-    until player_win? || @num_guesses_remaining <= 0
-      play_round
-    end
+    play_round
 
     if player_win?
       puts 'Congratulations, you guessed the word!'
@@ -138,18 +138,18 @@ class Game
       puts 'Dang! You ran out of guesses'
     end
   end
-
-
 end
+
+
 
 class Cell
   attr_accessor :revealed
   attr_reader :letter
   
   # A cell is not revealed by default
-  def initialize(letter)
+  def initialize(letter, revealed=false)
     @letter = letter
-    @revealed = false
+    @revealed = revealed
   end
 
   # If a cell is revealed, return the letter. Otherwise, return "_"
